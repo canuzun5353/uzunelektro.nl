@@ -1,0 +1,1 @@
+document.getElementById('contactForm').addEventListener('submit',function(e){e.preventDefault();const note=document.getElementById('formNote');note.textContent='Bedankt! Uw aanvraag is ontvangen.';note.style.color='#4f6810';this.reset();});
