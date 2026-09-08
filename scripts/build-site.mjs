@@ -1,4 +1,4 @@
-import { mkdir, rm, writeFile } from 'node:fs/promises';
+import { mkdir, rm, writeFile, readFile } from 'node:fs/promises';
 
 const out = new URL('../dist/', import.meta.url);
 const phoneDisplay = '06 13 27 12 61';
@@ -8,6 +8,46 @@ const phone2Display = '085 560 560 2';
 const phone2 = '+31855605602';
 const email = 'info@uzunelektro.nl';
 const address = 'Lijsterbesstraat 17, 5151 XD Drunen';
+
+function markdownToHtml(markdown='') {
+  const inline = (value) => value
+    .replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;').replaceAll('"','&quot;')
+    .replace(/\[([^\]]+)\]\(mailto\\?:([^\)]+)\)/g, '<a href="mailto:$2">$1</a>')
+    .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
+    .replace(/\*([^*]+)\*/g, '<em>$1</em>');
+  const lines = markdown.replace(/\r/g, '').split('\n');
+  let html = '', list = null, paragraph = [];
+  const flushParagraph = () => {
+    if (paragraph.length) html += `<p>${paragraph.map(inline).join('<br>')}</p>`;
+    paragraph = [];
+  };
+  const closeList = () => { if (list) html += `</${list}>`; list = null; };
+  for (const raw of lines) {
+    const line = raw.trim();
+    if (!line) { flushParagraph(); closeList(); continue; }
+    if (line === '---') { flushParagraph(); closeList(); html += '<hr>'; continue; }
+    const heading = line.match(/^(#{1,3})\s+(.+)$/);
+    if (heading) {
+      flushParagraph(); closeList();
+      const level = heading[1].length === 1 ? 2 : 3;
+      html += `<h${level}>${inline(heading[2])}</h${level}>`;
+      continue;
+    }
+    const item = line.match(/^[-*]\s+(.+)$/) || line.match(/^\d+\.\s+(.+)$/);
+    if (item) {
+      flushParagraph();
+      const type = /^\d+\./.test(line) ? 'ol' : 'ul';
+      if (list !== type) { closeList(); list = type; html += `<${type}>`; }
+      html += `<li>${inline(item[1])}</li>`;
+      continue;
+    }
+    paragraph.push(line);
+  }
+  flushParagraph(); closeList();
+  return html;
+}
+
+const algemeneVoorwaarden = markdownToHtml(await readFile(new URL('../content/algemene-voorwaarden.md', import.meta.url), 'utf8'));
 
 const services = [
   ['elektricien','Elektricien','elektricien Noord-Brabant','Elektrisch werk voor woning en bedrijf','Van kleine aanpassingen tot complete installaties: we bespreken de situatie, werken zorgvuldig en houden de oplossing begrijpelijk.','stopcontacten, verlichting, groepenkasten, bekabeling en storingen','Vraag uw elektrawerk aan'],
@@ -76,11 +116,17 @@ const homeBody = `<section class="hero"><div><p class="kicker">ELEKTROTECHNIEK �
 
 const localBusiness = `<script type="application/ld+json">${JSON.stringify({'@context':'https://schema.org','@type':'Electrician','name':'Uzun Elektrotechniek','alternateName':'Uzun Elektro','url':'https://www.uzunelektro.nl','telephone':phone,'email':email,'areaServed':'Noord-Brabant','address':{'@type':'PostalAddress','streetAddress':'Lijsterbesstraat 17','postalCode':'5151 XD','addressLocality':'Drunen','addressCountry':'NL'},'openingHours':'Mo-Fr 08:00-18:00'})}</script>`;
 
+const actionPromo = `<a class="promo-strip" href="/laadpaal-actie/"><strong>LAADPAALACTIE</strong><span>Solid 11 kW laadpaal voor € 449,99 excl. btw en installatie</span><b>Bekijk actie →</b></a>`;
+
 const files = new Map();
-files.set('index.html', layout({title:'Elektricien in Noord-Brabant | Uzun Elektrotechniek',description:'Elektrotechniek voor woningen en bedrijven in Noord-Brabant. Groepenkasten, storingen, laadpalen, beveiliging, netwerk en complete installaties.',keyword:'elektricien Noord-Brabant',body:homeBody,schema:localBusiness}));
+files.set('index.html', layout({title:'Elektricien in Noord-Brabant | Uzun Elektrotechniek',description:'Elektrotechniek voor woningen en bedrijven in Noord-Brabant. Groepenkasten, storingen, laadpalen, beveiliging, netwerk en complete installaties.',keyword:'elektricien Noord-Brabant',body:actionPromo + homeBody,schema:localBusiness}));
 
 const serviceIndex = `<section class="page-hero">${crumbs([])}<p class="kicker">ALLE DIENSTEN</p><h1>Elektrotechniek voor iedere situatie</h1><p>Van één extra aansluiting tot een complete installatie voor woning of bedrijf.</p><a class="btn" href="/offerte-aanvragen/">Vrijblijvende offerte</a></section><section class="section service-groups">${groups.map(([name,slugs])=>`<div><h2>${name}</h2>${cards(slugs)}</div>`).join('')}</section>${cta()}`;
 files.set('diensten/index.html',layout({title:'Elektrotechnische diensten | Uzun Elektrotechniek',description:'Bekijk alle diensten: groepenkasten, elektra, verlichting, storingen, laadpalen, beveiliging, netwerk en domotica.',path:'/diensten/',body:serviceIndex}));
+
+const actionWhatsapp = wa('Goedendag, ik heb interesse in de laadpaalactie van € 449,99 excl. btw en installatie.');
+const chargeActionBody = `<section class="action-hero"><div class="action-copy">${crumbs([['/laadpaal-installeren/','Laadpalen']])}<p class="kicker">ACTIE GELDIG T/M 1 NOVEMBER 2026</p><h1>11 kW laadpaal voor <em>€ 449,99</em></h1><p class="action-lead">Een slimme 3-fase laadpaal met vaste Type 2-laadkabel, RFID en bediening via een mobiele app.</p><div class="price-note"><strong>€ 449,99</strong><span>exclusief btw en installatie</span></div><div class="actions"><a class="btn whatsapp" href="${actionWhatsapp}" target="_blank" rel="noopener">Neem contact op via WhatsApp</a><a class="btn ghost" href="https://solarizon.nl/product/wallbox-laadstation-3-fase-16a/" target="_blank" rel="noopener noreferrer">Bekijk product</a></div><small>Actieprijs geldt voor de laadpaal zonder installatie. Zolang de voorraad strekt.</small></div><div class="action-product"><span class="action-badge">TIJDELIJKE ACTIE</span><img src="/assets/solid-laadpaal.png" alt="Solid EV laadstation met vaste laadkabel" width="760" height="700"></div></section><section class="section action-details"><div><p class="kicker">SOLID EV LAADSTATION</p><h2>Compact, slim en compleet</h2><p>Geschikt voor thuis of zakelijk laden. Het maximale laadvermogen hangt af van uw hoofdaansluiting en uw auto.</p></div><ul class="spec-list"><li><strong>11 kW</strong><span>Maximaal laadvermogen</span></li><li><strong>3-fase</strong><span>16 A, 380–480 V</span></li><li><strong>5 meter</strong><span>Vaste Type 2-laadkabel</span></li><li><strong>RFID + app</strong><span>Toegang en inzicht in verbruik</span></li></ul></section><section class="cta"><div><p class="kicker">INTERESSE?</p><h2>Reserveer de laadpaal via WhatsApp</h2><p>Stuur ons een bericht. We bespreken meteen de levering en, indien gewenst, een aparte prijs voor installatie.</p></div><a class="btn dark" href="${actionWhatsapp}" target="_blank" rel="noopener">Start WhatsApp-gesprek</a></section>`;
+files.set('laadpaal-actie/index.html',layout({title:'Laadpaalactie € 449,99 excl. btw | Uzun Elektro',description:'Solid 11 kW 3-fase laadpaal met 5 meter Type 2-kabel, RFID en mobiele app. Actieprijs € 449,99 exclusief btw en installatie, geldig t/m 1 november 2026.',path:'/laadpaal-actie/',body:chargeActionBody}));
 
 for (const s of services){
   const [slug,name,keyword,headline,intro,scope,button] = s;
@@ -134,7 +180,7 @@ files.set('bedankt/index.html',layout({title:'Bedankt voor uw aanvraag | Uzun El
 const legal = {
  'privacy':['Privacyverklaring','Deze pagina beschrijft welke persoonsgegevens via de website worden gevraagd en met welk doel.',`<h2>Welke gegevens wij verwerken</h2><p>Via formulieren kunnen naam, contactgegevens, adres, aanvraaginformatie en meegestuurde foto’s of documenten worden verwerkt. Wij gebruiken deze gegevens uitsluitend om contact op te nemen, de aanvraag te beoordelen, een afspraak te plannen en een offerte of opdracht uit te voeren.</p><h2>Bewaartermijn</h2><p>Aanvragen en bijlagen worden maximaal twee jaar bewaard, tenzij een wettelijke bewaarplicht of lopende overeenkomst een andere termijn vereist.</p><h2>Uw rechten</h2><p>Voor inzage, correctie of verwijdering kunt u contact opnemen met privacycontactpersoon Can Uzun via <a href="mailto:${email}">${email}</a>.</p><h2>Delen en beveiliging</h2><p>Gegevens worden niet voor marketingdoeleinden verkocht. Alleen partijen die noodzakelijk zijn voor communicatie, hosting of uitvoering kunnen gegevens verwerken volgens toepasselijke afspraken.</p>`],
  'cookiebeleid':['Cookiebeleid','Informatie over cookies en vergelijkbare technieken op deze website.',`<h2>Huidige situatie</h2><p>De website gebruikt momenteel geen marketingcookies en plaatst geen analysecookies. Wanneer Google Analytics of andere meetdiensten worden toegevoegd, wordt dit beleid bijgewerkt en wordt waar nodig toestemming gevraagd.</p>`],
- 'algemene-voorwaarden':['Algemene voorwaarden','Voorwaarden voor offertes en werkzaamheden van Uzun Elektrotechniek.',`<h2>Nog invullen</h2><p>De definitieve algemene voorwaarden zijn nog niet aangeleverd. Publiceer hier de voorwaarden die daadwerkelijk op offertes en opdrachten van toepassing zijn.</p>`],
+ 'algemene-voorwaarden':['Algemene voorwaarden','Algemene voorwaarden voor offertes, opdrachten, leveringen en werkzaamheden van Uzun Elektrotechniek.',algemeneVoorwaarden],
  'disclaimer':['Disclaimer','Toelichting op de informatie op deze website.',`<h2>Algemene informatie</h2><p>De website geeft algemene informatie over mogelijke werkzaamheden. Een definitieve technische beoordeling, prijs, planning en omvang volgen pas na inventarisatie en bevestiging in een offerte of opdracht.</p>`]
 };
 for(const [slug,[title,desc,content]] of Object.entries(legal)) simplePage(slug,title,'JURIDISCH',desc,content,'');
@@ -202,6 +248,8 @@ exit;
 ?>`;
 
 files.set('site.css',css + `.form-actions{display:flex;gap:12px;flex-wrap:wrap;align-items:center}.whatsapp-submit{background:var(--green);color:#fff}.phone-second{display:block;font:700 1.65rem "Barlow Condensed";margin:-18px 0 12px}.footer-grid strong{color:#fff;font-size:.78rem}@media(max-width:650px){.form-actions{display:grid}.form-actions .btn{width:100%}}`); files.set('site.js',js); files.set('api/submit.php',php);
+const actionCss = `.promo-strip{display:flex;align-items:center;justify-content:center;gap:26px;padding:13px 24px;background:var(--gold);color:var(--ink2);font-size:.88rem}.promo-strip strong{font-family:"Barlow Condensed";font-size:1.15rem;letter-spacing:.08em}.promo-strip b{white-space:nowrap}.action-hero{min-height:690px;padding:70px clamp(24px,7vw,108px);display:grid;grid-template-columns:1fr minmax(360px,.8fr);gap:7vw;align-items:center;background:linear-gradient(120deg,#f3f3f4 0 64%,#202126 64%)}.action-copy h1{font-size:clamp(3.5rem,6.5vw,6.8rem)}.action-copy h1 em{display:block;color:var(--gold2);font-style:normal}.action-lead{font-size:1.12rem;max-width:720px}.price-note{display:flex;align-items:baseline;gap:14px;margin:24px 0}.price-note strong{font:800 clamp(2.4rem,5vw,4.7rem) "Barlow Condensed"}.price-note span{color:var(--muted);font-weight:700}.whatsapp{background:var(--green);color:#fff}.whatsapp:hover{background:#0f6f32}.action-copy small{display:block;color:var(--muted);max-width:620px}.action-product{position:relative;background:#fff;padding:34px;box-shadow:0 24px 70px rgba(0,0,0,.25)}.action-product img{display:block;width:100%;aspect-ratio:1.08/1;object-fit:contain}.action-badge{position:absolute;top:18px;right:18px;background:var(--gold);padding:8px 12px;font-size:.72rem;font-weight:800;letter-spacing:.1em}.action-details{display:grid;grid-template-columns:.8fr 1.2fr;gap:8vw}.spec-list{list-style:none;padding:0;margin:0;display:grid;grid-template-columns:1fr 1fr}.spec-list li{padding:25px;border-bottom:1px solid var(--line);display:grid}.spec-list strong{font:800 1.8rem "Barlow Condensed"}.spec-list span{color:var(--muted);font-size:.86rem}@media(max-width:900px){.action-hero{grid-template-columns:1fr;background:var(--soft)}.action-product{max-width:620px}.action-details{grid-template-columns:1fr}}@media(max-width:650px){.promo-strip{align-items:flex-start;gap:4px;flex-direction:column;padding:11px 20px}.promo-strip b{display:none}.action-hero{padding:52px 20px}.action-product{padding:18px}.price-note{align-items:flex-start;flex-direction:column;gap:0}.spec-list{grid-template-columns:1fr}}`;
+files.set('site.css', files.get('site.css') + actionCss);
 files.set('robots.txt','User-agent: *\nAllow: /\nSitemap: https://www.uzunelektro.nl/sitemap.xml\n');
 const urls=['/',...Array.from(files.keys()).filter(x=>x.endsWith('/index.html')).map(x=>'/'+x.replace('index.html',''))];
 files.set('sitemap.xml',`<?xml version="1.0" encoding="UTF-8"?><urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">${urls.map(u=>`<url><loc>https://www.uzunelektro.nl${u}</loc></url>`).join('')}</urlset>`);
