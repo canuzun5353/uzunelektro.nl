@@ -8,15 +8,13 @@ Deze algemene voorwaarden zijn van toepassing op alle aanbiedingen, opdrachten e
 
 **Uzun Elektrotechniek**
 Handelsnaam: **Uzun Elektro**
-Lijsterbesstraat 17
-5151 XD Drunen
-*Geen bezoekadres – bezoek uitsluitend op afspraak*
+Werkgebied: Noord-Brabant
+*Geen publiek bezoekadres; bezoek uitsluitend op afspraak.*
 
 KvK-nummer: 82600678
 BTW-identificatienummer: NL003705240B58
 E-mail: [info@uzunelektro.nl](mailto\:info@uzunelektro.nl)
 Telefoon/WhatsApp: 06 13 27 12 61
-Telefoon: 085 560 560 2
 
 Hierna te noemen: **“Uzun Elektrotechniek”**.
 
@@ -560,15 +558,13 @@ De voorwaarden kunnen digitaal aan de opdrachtgever worden verstrekt en zijn op 
 
 **Uzun Elektrotechniek**
 Handelsnaam: Uzun Elektro
-Lijsterbesstraat 17
-5151 XD Drunen
-*Geen bezoekadres*
+Werkgebied: Noord-Brabant
+*Geen publiek bezoekadres; bezoek uitsluitend op afspraak.*
 
 KvK: 82600678
 BTW-ID: NL003705240B58
 E-mail: [info@uzunelektro.nl](mailto\:info@uzunelektro.nl)
 WhatsApp/telefoon: 06 13 27 12 61
-Telefoon: 085 560 560 2
 
 ---
 
