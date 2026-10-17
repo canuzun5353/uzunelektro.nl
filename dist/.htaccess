@@ -2,3 +2,9 @@ RewriteEngine On
 RewriteCond %{HTTPS} !=on [OR]
 RewriteCond %{HTTP_HOST} !^www\.uzunelektro\.nl$ [NC]
 RewriteRule ^ https://www.uzunelektro.nl%{REQUEST_URI} [R=301,L,NE]
+
+# Legacy English page: retain useful links to the current business page.
+RewriteRule ^about/?$ /over-ons/ [R=301,L]
+
+# Historical product spam URLs reported in Search Console; no current service uses this route.
+RewriteRule ^item/[a-z][0-9]+\.html$ - [G,L,NC]
