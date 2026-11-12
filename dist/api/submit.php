@@ -3,22 +3,75 @@ declare(strict_types=1);
 session_start();
 header('X-Content-Type-Options: nosniff');
 header('Referrer-Policy: strict-origin-when-cross-origin');
+
+function spamExit(): void {
+  header('Location: /bedankt/', true, 303);
+  exit;
+}
+
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') { http_response_code(405); exit('Alleen POST toegestaan.'); }
-if (!empty($_POST['website'] ?? '')) { header('Location: /bedankt/'); exit; }
-if (isset($_SESSION['last_submit']) && time() - (int)$_SESSION['last_submit'] < 20) { http_response_code(429); exit('Wacht even voordat u opnieuw verzendt.'); }
-$_SESSION['last_submit'] = time();
+
+$allowedHosts = ['uzunelektro.nl', 'www.uzunelektro.nl'];
+$source = (string)($_SERVER['HTTP_ORIGIN'] ?? $_SERVER['HTTP_REFERER'] ?? '');
+$sourceHost = strtolower((string)parse_url($source, PHP_URL_HOST));
+if ($sourceHost === '' || !in_array($sourceHost, $allowedHosts, true)) spamExit();
+
+if (!empty($_POST['website'] ?? '') || !empty($_POST['company_url'] ?? '')) spamExit();
+$started = filter_var($_POST['form_started'] ?? null, FILTER_VALIDATE_INT);
+$elapsed = $started ? time() - (int)$started : 0;
+if (!$started || $elapsed < 3 || $elapsed > 43200) spamExit();
+
+$ip = (string)($_SERVER['REMOTE_ADDR'] ?? 'unknown');
+$rateFile = sys_get_temp_dir() . '/uzun-form-' . hash('sha256', $ip) . '.json';
+$now = time();
+$handle = @fopen($rateFile, 'c+');
+if ($handle) {
+  if (flock($handle, LOCK_EX)) {
+    $raw = stream_get_contents($handle);
+    $attempts = json_decode($raw ?: '[]', true);
+    if (!is_array($attempts)) $attempts = [];
+    $attempts = array_values(array_filter($attempts, fn($stamp) => is_int($stamp) && $stamp > $now - 3600));
+    if (count($attempts) >= 6) { flock($handle, LOCK_UN); fclose($handle); spamExit(); }
+    $attempts[] = $now;
+    ftruncate($handle, 0); rewind($handle); fwrite($handle, json_encode($attempts)); fflush($handle);
+    flock($handle, LOCK_UN);
+  }
+  fclose($handle);
+}
+
+$flatten = static function ($value): string {
+  if (is_array($value)) return implode(' ', array_map(static fn($item) => strip_tags((string)$item), $value));
+  return strip_tags((string)$value);
+};
+$allText = implode("\n", array_map($flatten, $_POST));
+if (strlen($allText) > 12000) spamExit();
+if (preg_match('/[\p{Cyrillic}]/u', $allText)) spamExit();
+if (preg_match('/(?:https?:\/\/|www\.|tinyurl\.com|bit\.ly|t\.me\/)/iu', $allText)) spamExit();
+
+$emailValue = trim((string)($_POST['email'] ?? ''));
+if ($emailValue !== '' && !filter_var($emailValue, FILTER_VALIDATE_EMAIL)) spamExit();
+$name = trim(strip_tags((string)($_POST['naam'] ?? (($_POST['voornaam'] ?? '') . ' ' . ($_POST['achternaam'] ?? '')))));
+if (strlen($name) < 2 || strlen($name) > 120 || preg_match('/\d{4,}/', $name)) spamExit();
+$phoneRaw = trim((string)($_POST['telefoon'] ?? ''));
+$phone = preg_replace('/[\s().-]+/', '', $phoneRaw);
+if (!preg_match('/^(?:\+31|0031|0)[1-9]\d{8,9}$/', $phone)) spamExit();
+$postcode = strtoupper(preg_replace('/\s+/', '', trim((string)($_POST['postcode'] ?? ''))));
+if ($postcode !== '' && !preg_match('/^[1-9]\d{3}[A-Z]{2}$/', $postcode)) spamExit();
+$place = trim((string)($_POST['plaats'] ?? ''));
+if ($place !== '' && (strlen($place) > 100 || str_contains($place, '@') || preg_match('/\d{3,}/', $place))) spamExit();
+
+if (isset($_SESSION['last_submit']) && $now - (int)$_SESSION['last_submit'] < 30) spamExit();
+$_SESSION['last_submit'] = $now;
 
 $recipient = 'info@uzunelektro.nl';
 $allowed = ['image/jpeg'=>'jpg','image/png'=>'png','image/webp'=>'webp','application/pdf'=>'pdf'];
 $fields = [];
 foreach ($_POST as $key => $value) {
-  if ($key === 'website') continue;
+  if (in_array($key, ['website', 'company_url', 'form_started'], true)) continue;
   $label = preg_replace('/[^a-zA-Z0-9_\-]/', '', (string)$key);
   if (is_array($value)) $value = implode(', ', array_map('strip_tags', $value));
   $fields[] = $label . ': ' . trim(strip_tags((string)$value));
 }
-$emailValue = filter_var($_POST['email'] ?? '', FILTER_VALIDATE_EMAIL) ?: '';
-$name = trim(strip_tags((string)($_POST['naam'] ?? (($_POST['voornaam'] ?? '') . ' ' . ($_POST['achternaam'] ?? '')))));
 $formType = preg_replace('/[^a-z0-9 -]/i', '', trim((string)($_POST['formulier'] ?? 'website')));
 $subject = 'Nieuwe ' . $formType . ' - Uzun Elektro website';
 $boundary = 'uzun-' . bin2hex(random_bytes(12));
@@ -49,6 +102,6 @@ if ($emailValue) {
   $confirmHeaders = "From: Uzun Elektro <info@uzunelektro.nl>\r\nContent-Type: text/plain; charset=UTF-8";
   mail($emailValue, $confirmSubject, $confirmBody, $confirmHeaders);
 }
-header('Location: /bedankt/');
+header('Location: /bedankt/', true, 303);
 exit;
 ?>
